@@ -1,0 +1,106 @@
+# ── Maven ─────────────────────────────────────────────────────────────────────
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# ── Java ──────────────────────────────────────────────────────────────────────
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+replay_pid*
+
+# ── Node / Angular ────────────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+frontend/.sass-cache/
+frontend/npm-debug.log*
+frontend/yarn-error.log*
+frontend/.pnp
+frontend/.pnp.js
+
+# ── Angular build output (copied to Spring static resources) ──────────────────
+src/main/resources/static/browser/
+src/main/resources/static/3rdpartylicenses.txt
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ── IDEs — IntelliJ IDEA ──────────────────────────────────────────────────────
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# ── IDEs — Eclipse ────────────────────────────────────────────────────────────
+.classpath
+.project
+.settings/
+.factorypath
+bin/
+
+# ── IDEs — VS Code ────────────────────────────────────────────────────────────
+.vscode/
+!frontend/.vscode/
+
+# ── IDEs — NetBeans ───────────────────────────────────────────────────────────
+nbproject/private/
+nbbuild/
+nbdist/
+nbactions.xml
+nb-configuration.xml
+
+# ── STS / Spring Tool Suite ───────────────────────────────────────────────────
+.apt_generated
+.sts4-cache
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+gc.log*
+threaddump*.txt
+
+# ── Sensitive / environment ───────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+
+# ── Temporary & upload files ──────────────────────────────────────────────────
+*.tmp
+*.swp
+*.swo
+*~
+*.orig
+*.bak
+
+# ── JVM dump files (typically large, not committed) ───────────────────────────
+*.hprof
+*.jfr
+heap-dump*.bin
+
+# ── Word temp files ───────────────────────────────────────────────────────────
+~$*.docx
+~$*.xlsx
+~$*.pptx

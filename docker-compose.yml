@@ -1,0 +1,13 @@
+services:
+  performance-analyzer:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - JAVA_OPTS=-XX:+UseZGC -XX:MaxRAMPercentage=75.0
+    volumes:
+      - pa-uploads:/tmp
+    mem_limit: 4g
+
+volumes:
+  pa-uploads:

@@ -1,0 +1,20 @@
+[
+  {"prefix": "org.postgresql",        "layer": "Database / Network",  "description": "PostgreSQL JDBC driver",       "defaultDiagnosis": "High time in PostgreSQL JDBC — check query plan, connection pool saturation, or N+1 queries."},
+  {"prefix": "com.mysql",             "layer": "Database / Network",  "description": "MySQL Connector/J",           "defaultDiagnosis": "High time in MySQL driver — review slow queries or connection pool size."},
+  {"prefix": "oracle.jdbc",           "layer": "Database / Network",  "description": "Oracle JDBC driver",          "defaultDiagnosis": "High time in Oracle JDBC — review SQL performance and connection pool."},
+  {"prefix": "sun.nio",               "layer": "Database / Network",  "description": "NIO selector / socket IO",    "defaultDiagnosis": "High time in NIO — possible network I/O bottleneck."},
+  {"prefix": "java.net",              "layer": "Database / Network",  "description": "Java network APIs",           "defaultDiagnosis": "High time in network I/O — check remote service latency."},
+  {"prefix": "org.hibernate",         "layer": "ORM",                 "description": "Hibernate ORM",               "defaultDiagnosis": "High time in Hibernate — check for N+1 queries, missing fetch joins, or excessive flushing."},
+  {"prefix": "jakarta.persistence",   "layer": "ORM",                 "description": "Jakarta Persistence (JPA)",   "defaultDiagnosis": "High time in JPA — review entity mappings and query strategy."},
+  {"prefix": "com.fasterxml.jackson", "layer": "JSON",                "description": "Jackson JSON processor",       "defaultDiagnosis": "High time in Jackson — consider streaming API or view projections to reduce serialization cost."},
+  {"prefix": "com.google.gson",       "layer": "JSON",                "description": "Gson JSON processor",         "defaultDiagnosis": "High time in Gson — consider switching to Jackson or reducing object graph size."},
+  {"prefix": "javax.crypto",          "layer": "Cryptography",        "description": "JCA Cryptography",            "defaultDiagnosis": "High time in crypto — offload to async worker, cache derived keys, or check cipher mode."},
+  {"prefix": "sun.security",          "layer": "Cryptography",        "description": "Sun Security provider",        "defaultDiagnosis": "High time in Sun Security provider — review TLS handshake rate or certificate chain length."},
+  {"prefix": "org.apache.tomcat",     "layer": "HTTP / Web",          "description": "Tomcat servlet container",     "defaultDiagnosis": "High time in Tomcat — check thread pool exhaustion or connector backlog."},
+  {"prefix": "io.undertow",           "layer": "HTTP / Web",          "description": "Undertow server",              "defaultDiagnosis": "High time in Undertow — review I/O and worker thread pool configuration."},
+  {"prefix": "org.springframework.web","layer": "HTTP / Web",         "description": "Spring Web MVC",               "defaultDiagnosis": "High time in Spring Web — check handler mapping complexity or interceptor chains."},
+  {"prefix": "java.lang",             "layer": "JDK Core",            "description": "Java core lang",               "defaultDiagnosis": "High time in java.lang — inspect calling business code for algorithmic inefficiency."},
+  {"prefix": "java.util",             "layer": "JDK Core",            "description": "Java collections / util",      "defaultDiagnosis": "High time in java.util — check for linear scans on large collections."},
+  {"prefix": "sun.",                  "layer": "JDK Core",            "description": "Sun internal JDK classes",     "defaultDiagnosis": "High time in JDK internals — trace back to calling application code."},
+  {"prefix": "jdk.internal",          "layer": "JDK Core",            "description": "JDK internal modules",         "defaultDiagnosis": "High time in JDK internals — trace back to calling application code."}
+]

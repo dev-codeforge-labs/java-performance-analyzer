@@ -1,0 +1,45 @@
+spring:
+  servlet:
+    multipart:
+      max-file-size: 500MB
+      max-request-size: 550MB
+  mvc:
+    async:
+      request-timeout: 300000
+  web:
+    resources:
+      static-locations: classpath:/static/browser/,classpath:/static/
+
+server:
+  port: 8080
+
+performanceanalyzer:
+  session:
+    idle-timeout-minutes: 120
+  healthscore:
+    weights:
+      blocked-threads: 0.30
+      deadlock: 0.25
+      critical-diagnoses: 0.25
+      hotspot-concentration: 0.20
+  thresholds:
+    min-self-time-critical: 5.0
+    blocked-threads-alert: 20.0
+    gc-thrash-alert: 10.0
+    deadlock-confirmation-threshold: 1.0
+    calltree-max-depth: 200
+    heap-streaming-threshold-bytes: 2147483648  # 2 GB
+  integrations:
+    webhook:
+      url: ""
+      api-key: ""
+      timeout-ms: 5000
+  export:
+    pdf:
+      top-hotspots-count: 10
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
