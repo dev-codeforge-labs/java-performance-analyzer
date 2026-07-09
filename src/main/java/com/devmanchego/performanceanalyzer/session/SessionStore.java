@@ -36,8 +36,20 @@ public class SessionStore {
         sessions.remove(id);
     }
 
+    /** Checks presence without refreshing the idle timeout (unlike {@link #get}). */
+    public boolean exists(UUID id) {
+        return sessions.containsKey(id);
+    }
+
     public int size() {
         return sessions.size();
+    }
+
+    /** Removes every session and returns how many were cleared. */
+    public int clear() {
+        int count = sessions.size();
+        sessions.clear();
+        return count;
     }
 
     // Evict idle sessions every 15 minutes

@@ -5,6 +5,7 @@ import com.devmanchego.performanceanalyzer.aggregation.CallTreeSerializer;
 import com.devmanchego.performanceanalyzer.aggregation.HotspotExtractor;
 import com.devmanchego.performanceanalyzer.diagnostic.DiagnosticEngine;
 import com.devmanchego.performanceanalyzer.diagnostic.SignatureDictionary;
+import com.devmanchego.performanceanalyzer.diagnostic.rules.GcThrashingRule;
 import com.devmanchego.performanceanalyzer.health.HealthScoreService;
 import com.devmanchego.performanceanalyzer.metrics.AnalysisMetricsService;
 import com.devmanchego.performanceanalyzer.metrics.WebhookService;
@@ -12,6 +13,7 @@ import com.devmanchego.performanceanalyzer.model.*;
 import com.devmanchego.performanceanalyzer.session.AnalysisSession;
 import com.devmanchego.performanceanalyzer.session.SessionStore;
 import com.devmanchego.performanceanalyzer.timeline.TimelineService;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -31,6 +33,7 @@ public class AnalysisOrchestrator {
     private final TimelineService timelineService;
     private final AnalysisMetricsService metricsService;
     private final WebhookService webhookService;
+    private final GcThrashingRule gcThrashingRule;
 
     // Cache of computed results by sessionId
     private final Map<UUID, AnalysisResultDto> resultCache = new java.util.concurrent.ConcurrentHashMap<>();
@@ -44,7 +47,8 @@ public class AnalysisOrchestrator {
                                  HealthScoreService healthScoreService,
                                  TimelineService timelineService,
                                  AnalysisMetricsService metricsService,
-                                 WebhookService webhookService) {
+                                 WebhookService webhookService,
+                                 GcThrashingRule gcThrashingRule) {
         this.sessionStore = sessionStore;
         this.treeBuilder = treeBuilder;
         this.hotspotExtractor = hotspotExtractor;
@@ -55,6 +59,7 @@ public class AnalysisOrchestrator {
         this.timelineService = timelineService;
         this.metricsService = metricsService;
         this.webhookService = webhookService;
+        this.gcThrashingRule = gcThrashingRule;
     }
 
     public AnalysisResultDto analyze(UUID sessionId, RulesetDto ruleset) {
@@ -90,12 +95,14 @@ public class AnalysisOrchestrator {
         // Run diagnostic rules
         RulesetDto finalRuleset = ruleset;
         AnalysisContext ctx = new AnalysisContext(root, hotspots, snapshots, lockGraph, totalSamples, finalRuleset);
-        List<Diagnosis> diagnoses = diagnosticEngine.analyze(ctx);
+        List<Diagnosis> diagnoses = new ArrayList<>(diagnosticEngine.analyze(ctx));
 
-        // GC diagnoses
+        // GC diagnoses — the GC rule is not part of the AnalysisContext pipeline
+        // because GC data lives on the session, so fire it explicitly here.
         GcLogResult gcResult = session.getGcLogResult();
-        if (gcResult != null && gcResult.gcTimePercent() > 0) {
+        if (gcResult != null) {
             warnings.addAll(gcResult.warnings());
+            diagnoses.addAll(gcThrashingRule.analyzeGc(gcResult.gcTimePercent(), finalRuleset::threshold));
         }
 
         // Health score
@@ -142,6 +149,23 @@ public class AnalysisOrchestrator {
         return Optional.ofNullable(resultCache.get(sessionId));
     }
 
+    /** Drops a cached result immediately, e.g. when its session is explicitly deleted. */
+    public void evict(UUID sessionId) {
+        resultCache.remove(sessionId);
+    }
+
+    /** Drops every cached result, e.g. when all sessions are cleared. */
+    public void evictAll() {
+        resultCache.clear();
+    }
+
+    // Prune cached results whose session has been evicted from the store,
+    // so the cache does not grow unbounded (each entry holds a full call tree).
+    @Scheduled(fixedDelay = 900_000)
+    public void evictOrphanedResults() {
+        resultCache.keySet().removeIf(id -> !sessionStore.exists(id));
+    }
+
     private void applyLayerCategories(CallTreeNode node, RulesetDto ruleset) {
         if (!"[root]".equals(node.getMethodSignature())) {
             String pkg = extractPackage(node.getMethodSignature());
@@ -161,30 +185,29 @@ public class AnalysisOrchestrator {
     }
 
     private Map<String, String> buildLockGraph(List<SnapshotResult> snapshots) {
-        // Map: blocked thread id -> holding thread id (via monitor address)
-        Map<String, String> monitorToHolder = new HashMap<>();
-        Map<String, String> blockedToMonitor = new HashMap<>();
+        if (snapshots.isEmpty()) return Map.of();
 
-        for (SnapshotResult snap : snapshots) {
-            // First pass: find who holds each monitor
-            for (ThreadInfo t : snap.threads()) {
-                for (String monitor : t.lockedMonitors()) {
-                    monitorToHolder.put(monitor, t.id());
-                }
-            }
-            // Second pass: find who is waiting
-            for (ThreadInfo t : snap.threads()) {
-                if (t.state() == ThreadState.BLOCKED && t.waitingOnMonitor() != null) {
-                    blockedToMonitor.put(t.id(), t.waitingOnMonitor());
-                }
+        // Build the graph from a single snapshot so every edge reflects one consistent
+        // instant. Accumulating monitors/waiters across snapshots can fabricate cycles
+        // between threads that were never blocked at the same time. Deadlocks are
+        // permanent, so the most recent snapshot still contains any real one.
+        SnapshotResult snap = snapshots.get(snapshots.size() - 1);
+
+        Map<String, String> monitorToHolder = new HashMap<>();
+        for (ThreadInfo t : snap.threads()) {
+            for (String monitor : t.lockedMonitors()) {
+                monitorToHolder.put(monitor, t.id());
             }
         }
 
+        // Map: blocked thread id -> holding thread id (via monitor address)
         Map<String, String> lockGraph = new HashMap<>();
-        for (Map.Entry<String, String> e : blockedToMonitor.entrySet()) {
-            String holder = monitorToHolder.get(e.getValue());
-            if (holder != null) {
-                lockGraph.put(e.getKey(), holder);
+        for (ThreadInfo t : snap.threads()) {
+            if (t.state() == ThreadState.BLOCKED && t.waitingOnMonitor() != null) {
+                String holder = monitorToHolder.get(t.waitingOnMonitor());
+                if (holder != null && !holder.equals(t.id())) {
+                    lockGraph.put(t.id(), holder);
+                }
             }
         }
         return lockGraph;

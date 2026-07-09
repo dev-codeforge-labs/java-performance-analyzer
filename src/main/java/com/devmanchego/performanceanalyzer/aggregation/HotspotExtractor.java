@@ -12,14 +12,15 @@ import java.util.List;
 public class HotspotExtractor {
 
     public List<HotspotDto> extract(CallTreeNode root, int totalSamples) {
-        List<CallTreeNode> hotNodes = new ArrayList<>();
-        collectHotNodes(root, hotNodes);
+        List<HotNode> hotNodes = new ArrayList<>();
+        collectHotNodes(root, null, hotNodes);
 
-        hotNodes.sort(Comparator.comparingDouble(n -> -n.selfTimePercent(totalSamples)));
+        hotNodes.sort(Comparator.comparingDouble(hn -> -hn.node().selfTimePercent(totalSamples)));
 
         List<HotspotDto> result = new ArrayList<>();
         for (int i = 0; i < hotNodes.size(); i++) {
-            CallTreeNode node = hotNodes.get(i);
+            CallTreeNode node = hotNodes.get(i).node();
+            CallTreeNode parent = hotNodes.get(i).parent();
             String sig = node.getMethodSignature();
             String[] parts = splitSignature(sig);
             result.add(new HotspotDto(
@@ -30,7 +31,7 @@ public class HotspotExtractor {
                     node.getLayerCategory(),
                     node.selfTimePercent(totalSamples),
                     node.totalTimePercent(totalSamples),
-                    findTopCaller(node, root),
+                    topCaller(parent),
                     null,
                     null
             ));
@@ -38,29 +39,21 @@ public class HotspotExtractor {
         return result;
     }
 
-    private void collectHotNodes(CallTreeNode node, List<CallTreeNode> acc) {
+    private void collectHotNodes(CallTreeNode node, CallTreeNode parent, List<HotNode> acc) {
         if (node.getSelfSamples().get() > 0 && !"[root]".equals(node.getMethodSignature())) {
-            acc.add(node);
+            acc.add(new HotNode(node, parent));
         }
-        node.getChildren().values().forEach(child -> collectHotNodes(child, acc));
+        node.getChildren().values().forEach(child -> collectHotNodes(child, node, acc));
     }
 
-    /** Best-effort: returns the first parent that is NOT the root. */
-    private String findTopCaller(CallTreeNode node, CallTreeNode root) {
-        // Walk the tree to find this node's parent
-        return findParentSignature(root, node.getMethodSignature());
+    /** The direct caller of this node in its own branch, or null if called from the root. */
+    private String topCaller(CallTreeNode parent) {
+        if (parent == null || "[root]".equals(parent.getMethodSignature())) return null;
+        return parent.getMethodSignature();
     }
 
-    private String findParentSignature(CallTreeNode current, String targetSig) {
-        for (var entry : current.getChildren().entrySet()) {
-            if (entry.getKey().equals(targetSig)) {
-                return "[root]".equals(current.getMethodSignature()) ? null : current.getMethodSignature();
-            }
-            String found = findParentSignature(entry.getValue(), targetSig);
-            if (found != null) return found;
-        }
-        return null;
-    }
+    /** A hot node paired with the parent it was reached through, so the caller is unambiguous. */
+    private record HotNode(CallTreeNode node, CallTreeNode parent) {}
 
     private String[] splitSignature(String sig) {
         // "com.example.Foo.bar()" → className="com.example.Foo", package="com.example"

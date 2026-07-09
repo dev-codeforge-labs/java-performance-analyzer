@@ -26,6 +26,9 @@ public class WebhookService {
     @Value("${performanceanalyzer.integrations.webhook.timeout-ms:5000}")
     private int timeoutMs;
 
+    @Value("${performanceanalyzer.integrations.webhook.api-key:}")
+    private String apiKey;
+
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(5))
             .build();
@@ -38,10 +41,15 @@ public class WebhookService {
             try {
                 Map<String, Object> payload = buildPayload(result);
                 String body = mapper.writeValueAsString(payload);
-                HttpRequest req = HttpRequest.newBuilder()
+                HttpRequest.Builder builder = HttpRequest.newBuilder()
                         .uri(URI.create(webhookUrl))
                         .timeout(Duration.ofMillis(timeoutMs))
-                        .header("Content-Type", "application/json")
+                        .header("Content-Type", "application/json");
+                // Attach the configured API key so authenticated webhook endpoints accept the call.
+                if (apiKey != null && !apiKey.isBlank()) {
+                    builder.header("Authorization", "Bearer " + apiKey);
+                }
+                HttpRequest req = builder
                         .POST(HttpRequest.BodyPublishers.ofString(body))
                         .build();
                 httpClient.send(req, HttpResponse.BodyHandlers.discarding());
