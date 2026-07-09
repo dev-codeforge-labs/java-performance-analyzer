@@ -14,6 +14,9 @@ public class GcThrashingRule implements PerformanceRule {
     @Value("${performanceanalyzer.thresholds.gc-thrash-alert:10.0}")
     private double defaultGcThreshold;
 
+    @Value("${performanceanalyzer.thresholds.gc-thrash-critical:30.0}")
+    private double defaultGcCriticalThreshold;
+
     @Override
     public List<Diagnosis> analyze(AnalysisContext ctx) {
         // GC data is stored in the session; accessed via context extension in the orchestrator
@@ -23,8 +26,9 @@ public class GcThrashingRule implements PerformanceRule {
 
     public List<Diagnosis> analyzeGc(double gcTimePercent, RulesetRef ruleset) {
         double threshold = ruleset.threshold("gc-thrash-alert", defaultGcThreshold);
+        double criticalThreshold = ruleset.threshold("gc-thrash-critical", defaultGcCriticalThreshold);
         if (gcTimePercent >= threshold) {
-            String severity = gcTimePercent >= 30.0 ? "CRITICAL" : "WARNING";
+            String severity = gcTimePercent >= criticalThreshold ? "CRITICAL" : "WARNING";
             return List.of(new com.devmanchego.performanceanalyzer.model.Diagnosis(
                     "GC_THRASHING", severity,
                     String.format("GC consuming %.1f%% of elapsed time (threshold: %.0f%%). " +

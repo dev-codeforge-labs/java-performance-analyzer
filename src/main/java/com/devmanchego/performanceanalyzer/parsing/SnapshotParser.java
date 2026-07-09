@@ -99,11 +99,13 @@ public class SnapshotParser {
         m.matches();
 
         String name = m.group(1);
-        String id = m.group(3) != null ? m.group(3) : "?";
         boolean daemon = m.group(4) != null;
         int priority = Integer.parseInt(m.group(5));
         String tid = m.group(6);
         String nid = m.group(7);
+        // Fall back to the (unique) native tid when the dump has no "#id",
+        // otherwise every id-less thread collides under a shared "?" key.
+        String id = m.group(3) != null ? m.group(3) : tid;
         String rawState = m.group(8).trim().toUpperCase();
 
         ThreadState state = ThreadState.UNKNOWN;

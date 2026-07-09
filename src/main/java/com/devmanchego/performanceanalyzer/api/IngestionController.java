@@ -1,5 +1,6 @@
 package com.devmanchego.performanceanalyzer.api;
 
+import com.devmanchego.performanceanalyzer.analysis.AnalysisOrchestrator;
 import com.devmanchego.performanceanalyzer.ingestion.IngestionService;
 import com.devmanchego.performanceanalyzer.session.AnalysisSession;
 import com.devmanchego.performanceanalyzer.session.SessionStore;
@@ -19,10 +20,13 @@ public class IngestionController {
 
     private final IngestionService ingestionService;
     private final SessionStore sessionStore;
+    private final AnalysisOrchestrator orchestrator;
 
-    public IngestionController(IngestionService ingestionService, SessionStore sessionStore) {
+    public IngestionController(IngestionService ingestionService, SessionStore sessionStore,
+                              AnalysisOrchestrator orchestrator) {
         this.ingestionService = ingestionService;
         this.sessionStore = sessionStore;
+        this.orchestrator = orchestrator;
     }
 
     @PostMapping("/upload")
@@ -52,13 +56,14 @@ public class IngestionController {
     @DeleteMapping("/session/{id}")
     public ResponseEntity<Void> clearSession(@PathVariable UUID id) {
         sessionStore.remove(id);
+        orchestrator.evict(id);
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/session/clear")
     public ResponseEntity<Map<String, Integer>> clearAll() {
-        int count = sessionStore.size();
-        // Clear all by individual removal is not directly exposed — this is a dev convenience
+        int count = sessionStore.clear();
+        orchestrator.evictAll();
         return ResponseEntity.ok(Map.of("cleared", count));
     }
 

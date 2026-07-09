@@ -53,10 +53,13 @@ public class HealthScoreService {
                 new SignalBreakdown("Hotspot concentration %", topHotspotSelfTimePercent, concentrationScore, wConcentration)
         );
 
+        // The dominant factor is the signal that removed the most weighted points
+        // from a perfect score, i.e. max of (100 - points) * weight.
         String dominantFactor = breakdown.stream()
-                .min(Comparator.comparingDouble(b -> b.points() * b.weight()))
+                .max(Comparator.comparingDouble(b -> (100.0 - b.points()) * b.weight()))
+                .filter(b -> b.points() < 100.0)
                 .map(b -> "Score reduced primarily by: " + b.signal() + " = " + fmt(b.rawValue()))
-                .orElse("");
+                .orElse("No significant score reduction");
 
         return new HealthScoreDto(score, classification, dominantFactor, breakdown);
     }

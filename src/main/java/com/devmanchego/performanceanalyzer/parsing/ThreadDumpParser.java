@@ -77,45 +77,39 @@ public class ThreadDumpParser {
 
     /**
      * Splits the input stream into logical snapshot blocks.
-     * A new block begins when a snapshot boundary line is detected.
+     * A new block begins at each boundary line ("Full thread dump" header or a
+     * leading timestamp), but only once the current block already holds real
+     * content — so a timestamp immediately followed by a "Full thread dump"
+     * header stays in the same block instead of producing an empty one.
+     * A file with no boundaries at all becomes a single block.
      */
     private List<List<String>> splitIntoBlocks(InputStream input) throws IOException {
         List<List<String>> blocks = new ArrayList<>();
         List<String> currentBlock = new ArrayList<>();
-        boolean inDump = false;
+        boolean hasBody = false; // current block holds at least one non-boundary content line
 
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(input, StandardCharsets.UTF_8))) {
 
             String line;
             while ((line = reader.readLine()) != null) {
-                if (FULL_DUMP_HEADER.matcher(line).find()) {
-                    if (inDump && !currentBlock.isEmpty()) {
-                        blocks.add(new ArrayList<>(currentBlock));
-                        currentBlock.clear();
-                    }
-                    inDump = true;
-                    currentBlock.add(line);
-                } else if (inDump) {
-                    currentBlock.add(line);
-                } else if (SNAPSHOT_BOUNDARY.matcher(line).find()) {
-                    // Snapshot starting with a timestamp but no "Full thread dump" header
-                    if (!currentBlock.isEmpty()) {
-                        blocks.add(new ArrayList<>(currentBlock));
-                        currentBlock.clear();
-                    }
-                    inDump = true;
-                    currentBlock.add(line);
+                boolean boundary = FULL_DUMP_HEADER.matcher(line).find()
+                        || SNAPSHOT_BOUNDARY.matcher(line).find();
+
+                if (boundary && hasBody) {
+                    blocks.add(new ArrayList<>(currentBlock));
+                    currentBlock.clear();
+                    hasBody = false;
+                }
+
+                currentBlock.add(line);
+                if (!boundary && !line.isBlank()) {
+                    hasBody = true;
                 }
             }
         }
 
-        if (!currentBlock.isEmpty()) {
-            blocks.add(currentBlock);
-        }
-
-        // If no boundaries found, treat entire file as a single snapshot
-        if (blocks.isEmpty() && !currentBlock.isEmpty()) {
+        if (hasBody) {
             blocks.add(currentBlock);
         }
 

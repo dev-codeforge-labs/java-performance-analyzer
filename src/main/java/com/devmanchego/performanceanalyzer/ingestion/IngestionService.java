@@ -1,6 +1,9 @@
 package com.devmanchego.performanceanalyzer.ingestion;
 
 import com.devmanchego.performanceanalyzer.model.DumpType;
+import com.devmanchego.performanceanalyzer.model.ParseWarning;
+import com.devmanchego.performanceanalyzer.model.SnapshotResult;
+import com.devmanchego.performanceanalyzer.model.ThreadDumpResult;
 import com.devmanchego.performanceanalyzer.parsing.FormatDetector;
 import com.devmanchego.performanceanalyzer.parsing.GcLogParser;
 import com.devmanchego.performanceanalyzer.parsing.JfrParser;
@@ -50,6 +53,14 @@ public class IngestionService {
 
         AnalysisSession session = new AnalysisSession(fileNames, dumpTypes);
 
+        // Snapshots from every thread-dump / JFR file are merged into one result
+        // instead of the last file silently overwriting the previous ones.
+        List<SnapshotResult> mergedSnapshots = new ArrayList<>();
+        List<ParseWarning> mergedWarnings = new ArrayList<>();
+        int expectedSnapshots = 0;
+        boolean hasThreadSource = false;
+        int gcLogCount = 0;
+
         // Second pass: parse each file
         for (int i = 0; i < files.size(); i++) {
             DumpType type = dumpTypes.get(i);
@@ -57,21 +68,42 @@ public class IngestionService {
 
             switch (type) {
                 case THREAD_DUMP -> {
-                    var result = threadDumpParser.parse(new ByteArrayInputStream(bytes));
-                    session.setThreadDumpResult(result);
+                    ThreadDumpResult result = threadDumpParser.parse(new ByteArrayInputStream(bytes));
+                    mergedSnapshots.addAll(result.snapshots());
+                    mergedWarnings.addAll(result.globalWarnings());
+                    expectedSnapshots += result.totalSnapshotsExpected();
+                    hasThreadSource = true;
                 }
                 case GC_LOG -> {
                     var result = gcLogParser.parse(new ByteArrayInputStream(bytes));
+                    if (++gcLogCount > 1) {
+                        mergedWarnings.add(ParseWarning.of("MULTIPLE_GC_LOGS",
+                                "Multiple GC logs uploaded — only '" + fileNames.get(i)
+                                        + "' is retained; earlier GC logs were replaced"));
+                    }
                     session.setGcLogResult(result);
                 }
                 case JFR_RECORDING -> {
-                    var result = jfrParser.parse(new ByteArrayInputStream(bytes));
-                    session.setThreadDumpResult(result);
+                    ThreadDumpResult result = jfrParser.parse(new ByteArrayInputStream(bytes));
+                    mergedSnapshots.addAll(result.snapshots());
+                    mergedWarnings.addAll(result.globalWarnings());
+                    expectedSnapshots += result.totalSnapshotsExpected();
+                    hasThreadSource = true;
                 }
                 case HEAP_DUMP -> {
                     // Module 4 — Eclipse MAT not on Maven Central, placeholder
                 }
             }
+        }
+
+        if (hasThreadSource) {
+            // Re-index snapshots sequentially so indices stay unique across merged files.
+            List<SnapshotResult> reindexed = new ArrayList<>(mergedSnapshots.size());
+            int idx = 0;
+            for (SnapshotResult s : mergedSnapshots) {
+                reindexed.add(new SnapshotResult(idx++, s.timestamp(), s.threads(), s.warnings()));
+            }
+            session.setThreadDumpResult(new ThreadDumpResult(reindexed, expectedSnapshots, mergedWarnings));
         }
 
         sessionStore.put(session);

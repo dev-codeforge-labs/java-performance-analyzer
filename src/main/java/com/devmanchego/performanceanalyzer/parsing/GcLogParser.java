@@ -36,7 +36,7 @@ public class GcLogParser {
 
     // Legacy: 2024-01-01T00:00:01.000+0000: 1.234: [GC (Allocation Failure) [PSYoungGen: 512K->256K(1024K)] 1024K->768K(2048K), 0.012345 secs]
     private static final Pattern LEGACY_GC = Pattern.compile(
-            "(?:^|\\s)(\\d+\\.\\d+):\\s+\\[(?:Full\\s+)?(GC|Full GC).*?(\\d+)K->(\\d+)K\\((\\d+)K\\)[^,]*,\\s+(\\d+\\.\\d+)\\s+secs]"
+            "(?:^|\\s)(\\d+\\.\\d+):\\s+\\[((?:Full\\s+)?GC).*?(\\d+)K->(\\d+)K\\((\\d+)K\\)[^,]*,\\s+(\\d+\\.\\d+)\\s+secs]"
     );
 
     private static final Pattern PROMOTION_FAILURE = Pattern.compile(
@@ -126,7 +126,7 @@ public class GcLogParser {
         Matcher m = LEGACY_GC.matcher(line);
         if (m.find()) {
             double ts = Double.parseDouble(m.group(1));
-            String type = m.group(2);
+            String type = m.group(2).trim().replaceAll("\\s+", " ");
             long before = Long.parseLong(m.group(3)) * 1024L;
             long after = Long.parseLong(m.group(4)) * 1024L;
             long total = Long.parseLong(m.group(5)) * 1024L;

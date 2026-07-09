@@ -26,6 +26,7 @@ performanceanalyzer:
     min-self-time-critical: 5.0
     blocked-threads-alert: 20.0
     gc-thrash-alert: 10.0
+    gc-thrash-critical: 30.0
     deadlock-confirmation-threshold: 1.0
     calltree-max-depth: 200
     heap-streaming-threshold-bytes: 2147483648  # 2 GB

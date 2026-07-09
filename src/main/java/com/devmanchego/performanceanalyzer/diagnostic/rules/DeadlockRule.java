@@ -25,38 +25,32 @@ public class DeadlockRule implements PerformanceRule {
         ));
     }
 
+    /**
+     * Each blocked thread waits on at most one other thread, so the graph has
+     * out-degree ≤ 1. We follow each chain and, when it revisits a node already
+     * on the current path, report exactly the threads forming that cycle —
+     * excluding threads that merely queue behind it.
+     */
     private List<String> detectCycles(Map<String, String> graph) {
-        Set<String> visited = new HashSet<>();
-        Set<String> inStack = new HashSet<>();
-        List<String> cycleNodes = new ArrayList<>();
+        Set<String> globallyVisited = new HashSet<>();
 
-        for (String node : graph.keySet()) {
-            if (!visited.contains(node)) {
-                dfs(node, graph, visited, inStack, cycleNodes);
-            }
-        }
-        return cycleNodes;
-    }
+        for (String start : graph.keySet()) {
+            if (globallyVisited.contains(start)) continue;
 
-    private boolean dfs(String node, Map<String, String> graph,
-                        Set<String> visited, Set<String> inStack, List<String> cycleNodes) {
-        visited.add(node);
-        inStack.add(node);
+            List<String> path = new ArrayList<>();
+            Set<String> inPath = new HashSet<>();
+            String node = start;
 
-        String neighbor = graph.get(node);
-        if (neighbor != null) {
-            if (!visited.contains(neighbor)) {
-                if (dfs(neighbor, graph, visited, inStack, cycleNodes)) {
-                    cycleNodes.add(node);
-                    return true;
+            while (node != null && !globallyVisited.contains(node)) {
+                if (inPath.contains(node)) {
+                    return new ArrayList<>(path.subList(path.indexOf(node), path.size()));
                 }
-            } else if (inStack.contains(neighbor)) {
-                cycleNodes.add(node);
-                cycleNodes.add(neighbor);
-                return true;
+                inPath.add(node);
+                path.add(node);
+                node = graph.get(node);
             }
+            globallyVisited.addAll(path);
         }
-        inStack.remove(node);
-        return false;
+        return List.of();
     }
 }

@@ -3,13 +3,10 @@ package com.devmanchego.performanceanalyzer.parsing;
 import com.devmanchego.performanceanalyzer.model.DumpType;
 import org.springframework.stereotype.Component;
 
-import java.io.BufferedReader;
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.regex.Pattern;
 
 /**
@@ -20,6 +17,7 @@ import java.util.regex.Pattern;
 public class FormatDetector {
 
     private static final int PROBE_LINES = 20;
+    private static final int PROBE_BYTES = 64 * 1024;
 
     // Thread dump signals
     private static final Pattern THREAD_DUMP_SIGNAL = Pattern.compile(
@@ -40,16 +38,24 @@ public class FormatDetector {
     private static final String HPROF_MAGIC = "JAVA PROFILE";
 
     public DumpType detect(InputStream input, String filename) throws IOException {
-        byte[] header = input.readNBytes(12);
+        BufferedInputStream in = input instanceof BufferedInputStream b
+                ? b : new BufferedInputStream(input);
+
+        in.mark(PROBE_BYTES + 16);
+        byte[] header = in.readNBytes(12);
 
         if (isJfr(header)) return DumpType.JFR_RECORDING;
         if (isHprof(header)) return DumpType.HEAP_DUMP;
 
-        // Text-based: read probe lines
-        String headerText = new String(header, StandardCharsets.UTF_8);
-        List<String> probeLines = readProbeLines(input, headerText);
+        // Text-based: rewind and read the probe from the very first byte so a
+        // signal spanning the 12-byte header boundary is not missed.
+        in.reset();
+        byte[] probe = in.readNBytes(PROBE_BYTES);
+        String probeText = new String(probe, StandardCharsets.UTF_8);
 
-        for (String line : probeLines) {
+        int count = 0;
+        for (String line : (Iterable<String>) probeText.lines()::iterator) {
+            if (count++ >= PROBE_LINES) break;
             if (THREAD_DUMP_SIGNAL.matcher(line).find()) return DumpType.THREAD_DUMP;
             if (GC_LOG_SIGNAL.matcher(line).find()) return DumpType.GC_LOG;
         }
@@ -75,23 +81,5 @@ public class FormatDetector {
         if (header.length < HPROF_MAGIC.length()) return false;
         return new String(header, 0, HPROF_MAGIC.length(), StandardCharsets.US_ASCII)
                 .startsWith(HPROF_MAGIC);
-    }
-
-    private List<String> readProbeLines(InputStream remaining, String headerText) throws IOException {
-        List<String> lines = new ArrayList<>();
-        // Include the header bytes as the first line
-        String firstLine = headerText.lines().findFirst().orElse("");
-        if (!firstLine.isBlank()) lines.add(firstLine);
-
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(remaining, StandardCharsets.UTF_8))) {
-            String line;
-            int count = 0;
-            while ((line = reader.readLine()) != null && count < PROBE_LINES) {
-                lines.add(line);
-                count++;
-            }
-        }
-        return lines;
     }
 }

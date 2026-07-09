@@ -70,8 +70,8 @@ public class DiffService {
     private List<DiffResultDto.HotspotDiffEntry> diffHotspots(List<HotspotDto> a, List<HotspotDto> b) {
         if (a == null) a = List.of();
         if (b == null) b = List.of();
-        Map<String, HotspotDto> aMap = a.stream().collect(Collectors.toMap(HotspotDto::methodSignature, h -> h));
-        Map<String, HotspotDto> bMap = b.stream().collect(Collectors.toMap(HotspotDto::methodSignature, h -> h));
+        Map<String, HotspotDto> aMap = a.stream().collect(Collectors.toMap(HotspotDto::methodSignature, h -> h, (x, y) -> x));
+        Map<String, HotspotDto> bMap = b.stream().collect(Collectors.toMap(HotspotDto::methodSignature, h -> h, (x, y) -> x));
         Set<String> all = new LinkedHashSet<>();
         a.forEach(h -> all.add(h.methodSignature()));
         b.forEach(h -> all.add(h.methodSignature()));
